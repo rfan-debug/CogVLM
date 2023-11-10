@@ -30,6 +30,8 @@ def main():
     parser = CogVLMModel.add_model_specific_args(parser)
     args = parser.parse_args()
 
+    print(f"world size: {world_size}; rank: {rank}")
+
     # load model
     model, model_args = CogVLMModel.from_pretrained(
         args.from_pretrained,

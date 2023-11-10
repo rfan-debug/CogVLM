@@ -23,7 +23,7 @@ from sat.mpu import get_model_parallel_rank
 def process_image(text, text_processor, img_processor, image=None):
     """
     This function tries to read images from paths when the image is None; if `image` is not None, directly processes
-    this image. 
+    this image.
     """
     image_position = text.rfind(text_processor.tokenizer.boi) + 5
     if image_position < 5:
