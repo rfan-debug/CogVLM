@@ -1,6 +1,7 @@
 import logging
 import gradio as gr
 import os, sys
+import torch.distributed
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -43,6 +44,7 @@ def process_image_without_resize(image_prompt):
 
 
 def load_model(args, rank, world_size):
+    print(f"Loading model from {rank} with world size {world_size}")
     model, model_args = CogVLMModel.from_pretrained(
         args.from_pretrained,
         args=argparse.Namespace(
@@ -82,7 +84,7 @@ def post(
     for i in range(len(result_text) - 1, -1, -1):
         if result_text[i][0] == "" or result_text[i][0] == None:
             del result_text[i]
-    log.info(f"history {result_text}")
+    print(f"history {result_text}")
 
     global model, image_processor, text_processor_infer, is_grounding
 
@@ -118,8 +120,8 @@ def post(
     else:
         result_text.append((input_text, answer))
 
-    log.error(result_text)
-    log.error('Chat task finished')
+    print(result_text)
+    print('Chat task finished')
     return "", result_text, hidden_image
 
 
@@ -189,11 +191,11 @@ def main(args, rank, world_size):
         clear_button.click(fn=clear_fn, inputs=clear_button, outputs=[input_text, result_text, image_prompt])
         image_prompt.upload(fn=clear_fn2, inputs=clear_button, outputs=[result_text])
         image_prompt.clear(fn=clear_fn2, inputs=clear_button, outputs=[result_text])
-        log.info(f"Gradio version: {gr.__version__}")
+        print(f"Gradio version: {gr.__version__}")
 
     demo.queue(concurrency_count=10)
 
-    log.info(f"Current rank: {rank}, world_size: {world_size}")
+    print(f"Current rank: {rank}, world_size: {world_size}")
     demo.launch()
 
 
