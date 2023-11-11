@@ -1,5 +1,6 @@
 # -*- encoding: utf-8 -*-
 import os, sys
+
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import torch
@@ -10,6 +11,7 @@ from utils.chat import chat
 from models.cogvlm_model import CogVLMModel
 from utils.language import llama2_tokenizer, llama2_text_processor_inference
 from utils.vision import get_image_processor
+
 
 def main():
     parser = argparse.ArgumentParser()
@@ -34,17 +36,19 @@ def main():
     model, model_args = CogVLMModel.from_pretrained(
         args.from_pretrained,
         args=argparse.Namespace(
-        deepspeed=None,
-        local_rank=rank,
-        rank=rank,
-        world_size=world_size,
-        model_parallel_size=world_size,
-        mode='inference',
-        skip_init=True,
-        use_gpu_initialization=True if torch.cuda.is_available() else False,
-        device='cuda',
-        **vars(args)
-    ), overwrite_args={'model_parallel_size': world_size} if world_size != 1 else {})
+            deepspeed=None,
+            local_rank=rank,
+            rank=rank,
+            world_size=world_size,
+            model_parallel_size=world_size,
+            mode='inference',
+            skip_init=True,
+            use_gpu_initialization=True if torch.cuda.is_available() else False,
+            device='cuda',
+            **vars(args)
+        ),
+        overwrite_args={'model_parallel_size': world_size} if world_size != 1 else {}
+    )
     model = model.eval()
     from sat.mpu import get_model_parallel_world_size
     assert world_size == get_model_parallel_world_size(), "world size must equal to model parallel size for cli_demo!"
@@ -61,7 +65,8 @@ def main():
             print('欢迎使用 CogVLM-CLI ，输入图像URL或本地路径读图，继续输入内容对话，clear 重新开始，stop 终止程序')
     else:
         if rank == 0:
-            print('Welcome to CogVLM-CLI. Enter an image URL or local file path to load an image. Continue inputting text to engage in a conversation. Type "clear" to start over, or "stop" to end the program.')
+            print(
+                'Welcome to CogVLM-CLI. Enter an image URL or local file path to load an image. Continue inputting text to engage in a conversation. Type "clear" to start over, or "stop" to end the program.')
     with torch.no_grad():
         while True:
             history = None
@@ -73,7 +78,8 @@ def main():
                     image_path = [None]
             else:
                 if rank == 0:
-                    image_path = [input("Please enter the image path or URL (press Enter for plain text conversation): ")]
+                    image_path = [
+                        input("Please enter the image path or URL (press Enter for plain text conversation): ")]
                 else:
                     image_path = [None]
             if world_size > 1:
@@ -107,30 +113,30 @@ def main():
                     sys.exit(0)
                 try:
                     response, history, cache_image = chat(
-                        image_path, 
-                        model, 
+                        image_path,
+                        model,
                         text_processor_infer,
                         image_processor,
-                        query, 
-                        history=history, 
-                        image=cache_image, 
-                        max_length=args.max_length, 
-                        top_p=args.top_p, 
+                        query,
+                        history=history,
+                        image=cache_image,
+                        max_length=args.max_length,
+                        top_p=args.top_p,
                         temperature=args.temperature,
                         top_k=args.top_k,
                         invalid_slices=text_processor_infer.invalid_slices,
                         no_prompt=args.no_prompt
-                        )
+                    )
                 except Exception as e:
                     print(e)
                     break
                 if rank == 0:
                     if not args.english:
-                        print("模型："+response)
+                        print("模型：" + response)
                         if tokenizer.signal_type == "grounding":
                             print("Grounding 结果已保存至 ./output.png")
                     else:
-                        print("Model: "+response)
+                        print("Model: " + response)
                         if tokenizer.signal_type == "grounding":
                             print("Grounding result is saved at ./output.png")
                 image_path = None
