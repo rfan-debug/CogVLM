@@ -37,7 +37,7 @@ def process_image_without_resize(image_prompt):
 
 
 def load_model(args, rank, world_size):
-    print(f"Loading model from {rank} with world size {world_size}\n.")
+    print(f"Loading model from {rank} with world size {world_size}\n")
     model, model_args = CogVLMModel.from_pretrained(
         args.from_pretrained,
         args=argparse.Namespace(
@@ -100,6 +100,9 @@ def main(args,
         try:
             with torch.no_grad():
                 pil_img, image_path_grounding = process_image_without_resize(image_prompt)
+                torch.distributed.broadcast_object_list(input_text, src=0)
+                torch.distributed.broadcast_object_list(result_text, src=0)
+                # torch.distributed.broadcast(pil_img, src=0)
                 print("chat call started")
                 response, _, cache_image = chat(
                     image_path="",
@@ -135,8 +138,9 @@ def main(args,
         print('Chat task finished')
         return "", result_text, hidden_image
 
-    print(f"This rank: {rank}")
+
     if rank == 0:
+        print(f"This rank: {rank}, running the gradio UI")
         examples = []
         example_ids = list(range(3)) if not is_grounding else list(range(3, 6, 1))
         with open("./examples/example_inputs.jsonl") as f:
@@ -169,9 +173,7 @@ def main(args,
                 with gr.Column(scale=5):
                     result_text = gr.components.Chatbot(
                         label='Multi-round conversation History',
-                        value=[
-                            ("", "Hi, What do you want to know about this image?")
-                        ]).style(height=550)
+                        value=[("", "Hi, What do you want to know about this image?")]).style(height=550)
                     hidden_image_hash = gr.Textbox(visible=False)
 
             gr_examples = gr.Examples(examples=[[example["text"], example["image"]] for example in examples],
@@ -193,6 +195,9 @@ def main(args,
 
         demo.queue(concurrency_count=10)
         demo.launch()
+    else:
+        while True:
+            pass
 
 
 if __name__ == '__main__':
