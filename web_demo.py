@@ -1,3 +1,4 @@
+import logging
 import gradio as gr
 import os, sys
 
@@ -26,20 +27,22 @@ GROUNDING_NOTICE = 'Hint: When you check "Grounding", please use the <a href="ht
 
 default_chatbox = [("", "Hi, What do you want to know about this image?")]
 
-model = image_processor = text_processor_infer = None
-
+model = None
+image_processor = None
+text_processor_infer = None
 is_grounding = False
+
+log = logging.getLogger(__file__)
 
 def process_image_without_resize(image_prompt):
     image = Image.open(image_prompt)
-    # print(f"height:{image.height}, width:{image.width}")
     timestamp = int(time.time())
     file_ext = os.path.splitext(image_prompt)[1]
     filename_grounding = f"examples/{timestamp}_grounding{file_ext}"
     return image, filename_grounding
 
 
-def load_model(args, rank):
+def load_model(args, rank, world_size):
     model, model_args = CogVLMModel.from_pretrained(
         args.from_pretrained,
         args=argparse.Namespace(
@@ -79,7 +82,7 @@ def post(
     for i in range(len(result_text) - 1, -1, -1):
         if result_text[i][0] == "" or result_text[i][0] == None:
             del result_text[i]
-    print(f"history {result_text}")
+    log.info(f"history {result_text}")
 
     global model, image_processor, text_processor_infer, is_grounding
 
@@ -98,12 +101,11 @@ def post(
                 top_p=top_p,
                 temperature=temperature,
                 top_k=top_k,
-                invalid_slices=text_processor_infer.invalid_slices if hasattr(text_processor_infer,
-                                                                              "invalid_slices") else [],
+                invalid_slices=text_processor_infer.invalid_slices if hasattr(text_processor_infer, "invalid_slices") else [],
                 no_prompt=False
             )
     except Exception as e:
-        print("error message", e)
+        log.error("error message", e)
         result_text.append((input_text, 'Timeout! Please wait a few minutes and retry.'))
         return "", result_text, hidden_image
 
@@ -115,8 +117,9 @@ def post(
         result_text.append((None, (image_path_grounding,)))
     else:
         result_text.append((input_text, answer))
-    print(result_text)
-    print('finished')
+
+    log.error(result_text)
+    log.error('Chat task finished')
     return "", result_text, hidden_image
 
 
@@ -128,9 +131,9 @@ def clear_fn2(value):
     return default_chatbox
 
 
-def main(args, rank):
+def main(args, rank, world_size):
     global model, image_processor, text_processor_infer, is_grounding
-    model, image_processor, text_processor_infer = load_model(args, rank)
+    model, image_processor, text_processor_infer = load_model(args, rank, world_size)
     is_grounding = 'grounding' in args.from_pretrained
 
     gr.close_all()
@@ -148,7 +151,7 @@ def main(args, rank):
         gr.Markdown(NOTES)
 
         with gr.Row():
-            with gr.Column(scale=4.5):
+            with gr.Column(scale=4):
                 with gr.Group():
                     input_text = gr.Textbox(label='Input Text',
                                             placeholder='Please enter text prompt below and press ENTER.')
@@ -163,9 +166,12 @@ def main(args, rank):
                     top_p = gr.Slider(maximum=1, value=0.4, minimum=0, label='Top P')
                     top_k = gr.Slider(maximum=100, value=10, minimum=1, step=1, label='Top K')
 
-            with gr.Column(scale=5.5):
-                result_text = gr.components.Chatbot(label='Multi-round conversation History', value=[
-                    ("", "Hi, What do you want to know about this image?")]).style(height=550)
+            with gr.Column(scale=5):
+                result_text = gr.components.Chatbot(
+                    label='Multi-round conversation History',
+                    value=[
+                        ("", "Hi, What do you want to know about this image?")
+                    ]).style(height=550)
                 hidden_image_hash = gr.Textbox(visible=False)
 
         gr_examples = gr.Examples(examples=[[example["text"], example["image"]] for example in examples],
@@ -174,8 +180,6 @@ def main(args, rank):
                                   examples_per_page=6)
 
         gr.Markdown(MAINTENANCE_NOTICE1)
-
-        print(gr.__version__)
         run_button.click(fn=post,
                          inputs=[input_text, temperature, top_p, top_k, image_prompt, result_text, hidden_image_hash],
                          outputs=[input_text, result_text, hidden_image_hash])
@@ -185,13 +189,12 @@ def main(args, rank):
         clear_button.click(fn=clear_fn, inputs=clear_button, outputs=[input_text, result_text, image_prompt])
         image_prompt.upload(fn=clear_fn2, inputs=clear_button, outputs=[result_text])
         image_prompt.clear(fn=clear_fn2, inputs=clear_button, outputs=[result_text])
-
-        print(gr.__version__)
+        log.info(f"Gradio version: {gr.__version__}")
 
     demo.queue(concurrency_count=10)
 
-    if rank == 0:
-        demo.launch()
+    log.info(f"Current rank: {rank}, world_size: {world_size}")
+    demo.launch()
 
 
 if __name__ == '__main__':
@@ -214,4 +217,4 @@ if __name__ == '__main__':
     world_size = int(os.environ.get('WORLD_SIZE', 1))
     parser = CogVLMModel.add_model_specific_args(parser)
     args = parser.parse_args()
-    main(args, rank)
+    main(args, rank, world_size)
