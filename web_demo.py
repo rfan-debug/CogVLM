@@ -130,7 +130,7 @@ def clear_fn2(value):
 
 def main(args, rank):
     global model, image_processor, text_processor_infer, is_grounding
-    model, image_processor, text_processor_infer = load_model(args)
+    model, image_processor, text_processor_infer = load_model(args, rank)
     is_grounding = 'grounding' in args.from_pretrained
 
     gr.close_all()
