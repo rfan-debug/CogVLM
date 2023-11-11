@@ -1,4 +1,3 @@
-import logging
 import gradio as gr
 import os, sys
 import torch.distributed
@@ -28,12 +27,6 @@ GROUNDING_NOTICE = 'Hint: When you check "Grounding", please use the <a href="ht
 
 default_chatbox = [("", "Hi, What do you want to know about this image?")]
 
-model = None
-image_processor = None
-text_processor_infer = None
-is_grounding = False
-
-log = logging.getLogger(__file__)
 
 def process_image_without_resize(image_prompt):
     image = Image.open(image_prompt)
@@ -71,60 +64,6 @@ def load_model(args, rank, world_size):
     return model, image_processor, text_processor_infer
 
 
-def post(
-        input_text,
-        temperature,
-        top_p,
-        top_k,
-        image_prompt,
-        result_previous,
-        hidden_image,
-):
-    result_text = [(ele[0], ele[1]) for ele in result_previous]
-    for i in range(len(result_text) - 1, -1, -1):
-        if result_text[i][0] == "" or result_text[i][0] == None:
-            del result_text[i]
-    print(f"history {result_text}")
-
-    global model, image_processor, text_processor_infer, is_grounding
-
-    try:
-        with torch.no_grad():
-            pil_img, image_path_grounding = process_image_without_resize(image_prompt)
-            response, _, cache_image = chat(
-                image_path="",
-                model=model,
-                text_processor=text_processor_infer,
-                img_processor=image_processor,
-                query=input_text,
-                history=result_text,
-                image=pil_img,
-                max_length=2048,
-                top_p=top_p,
-                temperature=temperature,
-                top_k=top_k,
-                invalid_slices=text_processor_infer.invalid_slices if hasattr(text_processor_infer, "invalid_slices") else [],
-                no_prompt=False
-            )
-    except Exception as e:
-        log.error("error message", e)
-        result_text.append((input_text, 'Timeout! Please wait a few minutes and retry.'))
-        return "", result_text, hidden_image
-
-    answer = response
-    if is_grounding:
-        parse_response(pil_img, answer, image_path_grounding)
-        new_answer = answer.replace(input_text, "")
-        result_text.append((input_text, new_answer))
-        result_text.append((None, (image_path_grounding,)))
-    else:
-        result_text.append((input_text, answer))
-
-    print(result_text)
-    print('Chat task finished')
-    return "", result_text, hidden_image
-
-
 def clear_fn(value):
     return "", default_chatbox, None
 
@@ -133,70 +72,126 @@ def clear_fn2(value):
     return default_chatbox
 
 
-def main(args, rank, world_size):
-    global model, image_processor, text_processor_infer, is_grounding
-    model, image_processor, text_processor_infer = load_model(args, rank, world_size)
+def main(args,
+         model,
+         image_processor,
+         text_processor_infer,
+         rank,
+         ):
     is_grounding = 'grounding' in args.from_pretrained
-
     gr.close_all()
-    examples = []
-    example_ids = list(range(3)) if not is_grounding else list(range(3, 6, 1))
-    with open("./examples/example_inputs.jsonl") as f:
-        for i, line in enumerate(f):
-            if i not in example_ids: continue
-            data = json.loads(line)
-            examples.append(data)
 
-    with gr.Blocks(css='style.css') as demo:
+    def call_predict(
+            input_text,
+            temperature,
+            top_p,
+            top_k,
+            image_prompt,
+            result_previous,
+            hidden_image,
+    ):
+        result_text = [(ele[0], ele[1]) for ele in result_previous]
+        for i in range(len(result_text) - 1, -1, -1):
+            if result_text[i][0] == "" or result_text[i][0] == None:
+                del result_text[i]
+        print(f"history {result_text}")
 
-        gr.Markdown(DESCRIPTION)
-        gr.Markdown(NOTES)
+        try:
+            with torch.no_grad():
+                pil_img, image_path_grounding = process_image_without_resize(image_prompt)
+                print("chat call started")
+                response, _, cache_image = chat(
+                    image_path="",
+                    model=model,
+                    text_processor=text_processor_infer,
+                    img_processor=image_processor,
+                    query=input_text,
+                    history=result_text,
+                    image=pil_img,
+                    max_length=2048,
+                    top_p=top_p,
+                    temperature=temperature,
+                    top_k=top_k,
+                    invalid_slices=text_processor_infer.invalid_slices if hasattr(text_processor_infer, "invalid_slices") else [],
+                    no_prompt=False
+                )
+                print("chat call finished")
+        except Exception as e:
+            print("error message", e)
+            result_text.append((input_text, 'Timeout! Please wait a few minutes and retry.'))
+            return "", result_text, hidden_image
 
-        with gr.Row():
-            with gr.Column(scale=4):
-                with gr.Group():
-                    input_text = gr.Textbox(label='Input Text',
-                                            placeholder='Please enter text prompt below and press ENTER.')
+        answer = response
+        if is_grounding:
+            parse_response(pil_img, answer, image_path_grounding)
+            new_answer = answer.replace(input_text, "")
+            result_text.append((input_text, new_answer))
+            result_text.append((None, (image_path_grounding,)))
+        else:
+            result_text.append((input_text, answer))
+
+        print(result_text)
+        print('Chat task finished')
+        return "", result_text, hidden_image
+
+
+    if rank == 0:
+        examples = []
+        example_ids = list(range(3)) if not is_grounding else list(range(3, 6, 1))
+        with open("./examples/example_inputs.jsonl") as f:
+            for i, line in enumerate(f):
+                if i not in example_ids: continue
+                data = json.loads(line)
+                examples.append(data)
+
+        with gr.Blocks(css='style.css') as demo:
+
+            gr.Markdown(DESCRIPTION)
+            gr.Markdown(NOTES)
+
+            with gr.Row():
+                with gr.Column(scale=4):
+                    with gr.Group():
+                        input_text = gr.Textbox(label='Input Text',
+                                                placeholder='Please enter text prompt below and press ENTER.')
+                        with gr.Row():
+                            run_button = gr.Button('Generate')
+                            clear_button = gr.Button('Clear')
+
+                        image_prompt = gr.Image(type="filepath", label="Image Prompt", value=None)
+
                     with gr.Row():
-                        run_button = gr.Button('Generate')
-                        clear_button = gr.Button('Clear')
+                        temperature = gr.Slider(maximum=1, value=0.8, minimum=0, label='Temperature')
+                        top_p = gr.Slider(maximum=1, value=0.4, minimum=0, label='Top P')
+                        top_k = gr.Slider(maximum=100, value=10, minimum=1, step=1, label='Top K')
 
-                    image_prompt = gr.Image(type="filepath", label="Image Prompt", value=None)
+                with gr.Column(scale=5):
+                    result_text = gr.components.Chatbot(
+                        label='Multi-round conversation History',
+                        value=[
+                            ("", "Hi, What do you want to know about this image?")
+                        ]).style(height=550)
+                    hidden_image_hash = gr.Textbox(visible=False)
 
-                with gr.Row():
-                    temperature = gr.Slider(maximum=1, value=0.8, minimum=0, label='Temperature')
-                    top_p = gr.Slider(maximum=1, value=0.4, minimum=0, label='Top P')
-                    top_k = gr.Slider(maximum=100, value=10, minimum=1, step=1, label='Top K')
+            gr_examples = gr.Examples(examples=[[example["text"], example["image"]] for example in examples],
+                                      inputs=[input_text, image_prompt],
+                                      label="Example Inputs (Click to insert an examplet into the input box)",
+                                      examples_per_page=6)
 
-            with gr.Column(scale=5):
-                result_text = gr.components.Chatbot(
-                    label='Multi-round conversation History',
-                    value=[
-                        ("", "Hi, What do you want to know about this image?")
-                    ]).style(height=550)
-                hidden_image_hash = gr.Textbox(visible=False)
+            gr.Markdown(MAINTENANCE_NOTICE1)
+            run_button.click(fn=call_predict,
+                             inputs=[input_text, temperature, top_p, top_k, image_prompt, result_text, hidden_image_hash],
+                             outputs=[input_text, result_text, hidden_image_hash])
+            input_text.submit(fn=call_predict,
+                              inputs=[input_text, temperature, top_p, top_k, image_prompt, result_text, hidden_image_hash],
+                              outputs=[input_text, result_text, hidden_image_hash])
+            clear_button.click(fn=clear_fn, inputs=clear_button, outputs=[input_text, result_text, image_prompt])
+            image_prompt.upload(fn=clear_fn2, inputs=clear_button, outputs=[result_text])
+            image_prompt.clear(fn=clear_fn2, inputs=clear_button, outputs=[result_text])
+            print(f"Gradio version: {gr.__version__}")
 
-        gr_examples = gr.Examples(examples=[[example["text"], example["image"]] for example in examples],
-                                  inputs=[input_text, image_prompt],
-                                  label="Example Inputs (Click to insert an examplet into the input box)",
-                                  examples_per_page=6)
-
-        gr.Markdown(MAINTENANCE_NOTICE1)
-        run_button.click(fn=post,
-                         inputs=[input_text, temperature, top_p, top_k, image_prompt, result_text, hidden_image_hash],
-                         outputs=[input_text, result_text, hidden_image_hash])
-        input_text.submit(fn=post,
-                          inputs=[input_text, temperature, top_p, top_k, image_prompt, result_text, hidden_image_hash],
-                          outputs=[input_text, result_text, hidden_image_hash])
-        clear_button.click(fn=clear_fn, inputs=clear_button, outputs=[input_text, result_text, image_prompt])
-        image_prompt.upload(fn=clear_fn2, inputs=clear_button, outputs=[result_text])
-        image_prompt.clear(fn=clear_fn2, inputs=clear_button, outputs=[result_text])
-        print(f"Gradio version: {gr.__version__}")
-
-    demo.queue(concurrency_count=10)
-
-    print(f"Current rank: {rank}, world_size: {world_size}")
-    demo.launch()
+        demo.queue(concurrency_count=10)
+        demo.launch()
 
 
 if __name__ == '__main__':
@@ -219,4 +214,10 @@ if __name__ == '__main__':
     world_size = int(os.environ.get('WORLD_SIZE', 1))
     parser = CogVLMModel.add_model_specific_args(parser)
     args = parser.parse_args()
-    main(args, rank, world_size)
+    # Load models
+    model, image_processor, text_processor_infer = load_model(args, rank, world_size)
+    main(args,
+         model,
+         image_processor,
+         text_processor_infer,
+         rank)
