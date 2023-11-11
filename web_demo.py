@@ -114,16 +114,16 @@ def main(args,
                 torch.distributed.broadcast_object_list(input_text, src=0)
                 if len(result_text) > 0:
                     torch.distributed.broadcast_object_list(result_text, src=0)
-                # torch.distributed.broadcast(pil_img, src=0)
+                torch.distributed.broadcast_object_list(image_prompt, src=0)
                 print("chat call started")
                 response, _, cache_image = chat(
-                    image_path="",
+                    image_path=image_prompt,
                     model=model,
                     text_processor=text_processor_infer,
                     img_processor=image_processor,
                     query=input_text,
                     history=result_text,
-                    image=pil_img,
+                    image=None,
                     max_length=2048,
                     top_p=top_p,
                     temperature=temperature,
