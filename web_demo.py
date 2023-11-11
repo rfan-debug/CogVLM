@@ -1,6 +1,7 @@
 import gradio as gr
 import os, sys
 import torch.distributed
+import traceback
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -61,7 +62,7 @@ def load_model(args, rank, world_size):
     model.add_mixin('auto-regressive', CachedAutoregressiveMixin())
     text_processor_infer = llama2_text_processor_inference(tokenizer, args.max_length, model.image_length)
 
-    print("Model loading finished from {rank} with world size {world_size}\n.")
+    print(f"Model loading finished from {rank} with world size {world_size}\n.")
     return model, image_processor, text_processor_infer
 
 
@@ -122,6 +123,7 @@ def main(args,
                 print("chat call finished")
         except Exception as e:
             print("error message", e)
+            traceback.print_exc()
             result_text.append((input_text, 'Timeout! Please wait a few minutes and retry.'))
             return "", result_text, hidden_image
 
