@@ -37,7 +37,7 @@ def process_image_without_resize(image_prompt):
 
 
 def load_model(args, rank, world_size):
-    print(f"Loading model from {rank} with world size {world_size}")
+    print(f"Loading model from {rank} with world size {world_size}\n.")
     model, model_args = CogVLMModel.from_pretrained(
         args.from_pretrained,
         args=argparse.Namespace(
@@ -47,11 +47,10 @@ def load_model(args, rank, world_size):
             world_size=world_size,
             model_parallel_size=world_size,
             mode='inference',
-            fp16=args.fp16,
-            bf16=args.bf16,
             skip_init=True,
             use_gpu_initialization=True if torch.cuda.is_available() else False,
-            device=f'cuda'
+            device=f'cuda',
+            **vars(args)
         ),
         overwrite_args={'model_parallel_size': world_size} if world_size != 1 else {}
     )
@@ -61,6 +60,8 @@ def load_model(args, rank, world_size):
     image_processor = get_image_processor(model_args.eva_args["image_size"][0])
     model.add_mixin('auto-regressive', CachedAutoregressiveMixin())
     text_processor_infer = llama2_text_processor_inference(tokenizer, args.max_length, model.image_length)
+
+    print("Model loading finished from {rank} with world size {world_size}\n.")
     return model, image_processor, text_processor_infer
 
 
@@ -134,7 +135,7 @@ def main(args,
         print('Chat task finished')
         return "", result_text, hidden_image
 
-
+    print(f"This rank: {rank}")
     if rank == 0:
         examples = []
         example_ids = list(range(3)) if not is_grounding else list(range(3, 6, 1))
