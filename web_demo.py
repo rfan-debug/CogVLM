@@ -92,6 +92,16 @@ def main(args,
             result_previous,
             hidden_image,
     ):
+        print(
+            "input params:",
+            input_text,
+            temperature,
+            top_p,
+            top_k,
+            image_prompt,
+            result_previous,
+            hidden_image
+        )
         result_text = [(ele[0], ele[1]) for ele in result_previous]
         for i in range(len(result_text) - 1, -1, -1):
             if result_text[i][0] == "" or result_text[i][0] == None:
@@ -102,7 +112,8 @@ def main(args,
             with torch.no_grad():
                 pil_img, image_path_grounding = process_image_without_resize(image_prompt)
                 torch.distributed.broadcast_object_list(input_text, src=0)
-                torch.distributed.broadcast_object_list(result_text, src=0)
+                if len(result_text) > 0:
+                    torch.distributed.broadcast_object_list(result_text, src=0)
                 # torch.distributed.broadcast(pil_img, src=0)
                 print("chat call started")
                 response, _, cache_image = chat(
