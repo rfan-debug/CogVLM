@@ -113,6 +113,8 @@ def main():
                 if query == "stop":
                     sys.exit(0)
                 try:
+                    print(query)
+                    print(f"Calling chat from rank={rank}")
                     response, history, cache_image = chat(
                         image_path,
                         model,

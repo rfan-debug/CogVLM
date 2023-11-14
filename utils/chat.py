@@ -7,14 +7,17 @@
 '''
 
 import re
-from typing import Optional, Tuple, List
+from typing import Optional, Tuple, List, Callable
 import requests
 from PIL import Image
 from io import BytesIO
 
 import torch
 from sat.generation.autoregressive_sampling import filling_sequence, BaseStrategy, get_masks_and_position_ids_default
+from sat.model import LLaMAModel
 from sat.mpu import get_model_parallel_rank
+
+from utils.language import llama2_text_processor_inference
 
 
 def process_image(text, text_processor, img_processor, image=None):
@@ -46,9 +49,9 @@ def process_image(text, text_processor, img_processor, image=None):
 
 
 def chat(image_path: Optional[List[str]],
-         model,
-         text_processor,
-         img_processor,
+         model: LLaMAModel,
+         text_processor: llama2_text_processor_inference,
+         img_processor: Callable,
          query: str,
          history: List[Tuple[str, str]] = None,
          image: Image = None,
@@ -79,13 +82,12 @@ def chat(image_path: Optional[List[str]],
         torch_image = img_processor(force_pil_image) if img_processor is not None else {}
         pil_img = force_pil_image
     else:
-        prompt, image_position, (torch_image, pil_img) = process_image(prompt, text_processor, img_processor,
+        prompt, image_position, (torch_image, pil_img) = process_image(prompt,
+                                                                       text_processor,
+                                                                       img_processor,
                                                                        image=image)
 
     print(f"get model devices")
-    for each_param in model.parameters():
-        print("dtype:", each_param.dtype)
-        print("device:", each_param.device)
 
     print(f"chat: prompt: {prompt}")
     print(f"chat: image_position: {image_position}")
@@ -96,8 +98,9 @@ def chat(image_path: Optional[List[str]],
                 print(k, type(v))
 
             for k in torch_image:
-                if type(torch_image[k]) is torch.Tensor and torch_image[k].dtype is not torch.int and torch_image[
-                    k].dtype is not torch.long:
+                if type(torch_image[k]) is torch.Tensor and \
+                        torch_image[k].dtype is not torch.int and \
+                        torch_image[k].dtype is not torch.long:
                     torch_image[k] = torch_image[k].to(next(model.parameters()).dtype)
                 if type(torch_image[k]) is torch.Tensor:
                     torch_image[k] = torch_image[k].to(next(model.parameters()).device)
