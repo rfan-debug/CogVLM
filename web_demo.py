@@ -91,6 +91,7 @@ def main(args,
             image_prompt,
             result_previous,
             hidden_image,
+            rank,
     ):
         parameters_str = f"""
             input params:
@@ -101,6 +102,7 @@ def main(args,
             image_prompt: {image_prompt}
             result_previous: {result_previous}
             hidden_image: {hidden_image}
+            rank: {rank}
         """
 
         print(
@@ -117,9 +119,15 @@ def main(args,
                 pil_img, image_path_grounding = process_image_without_resize(image_prompt)
 
                 # Pull all necessary data into list so we can broadcast them through `torch.distributed.broadcast_object_list`.
-                image_prompts = [image_prompt]
-                input_texts = [input_text]
-                pil_imgs = [pil_img]
+                if rank == 0:
+                    image_prompts = [image_prompt]
+                    input_texts = [input_text]
+                    pil_imgs = [pil_img]
+                else:
+                    image_prompts = [None]
+                    input_texts = [None]
+                    pil_imgs = [None]
+
 
                 print("result_text: ", result_text)
 
@@ -172,7 +180,7 @@ def main(args,
         return "", result_text, hidden_image
 
 
-    if rank == 0:
+    if rank > 0:
         print(f"This rank: {rank}, running the gradio UI")
         examples = []
         example_ids = list(range(3)) if not is_grounding else list(range(3, 6, 1))
@@ -216,10 +224,10 @@ def main(args,
 
             gr.Markdown(MAINTENANCE_NOTICE1)
             run_button.click(fn=call_predict,
-                             inputs=[input_text, temperature, top_p, top_k, image_prompt, result_text, hidden_image_hash],
+                             inputs=[input_text, temperature, top_p, top_k, image_prompt, result_text, hidden_image_hash, rank],
                              outputs=[input_text, result_text, hidden_image_hash])
             input_text.submit(fn=call_predict,
-                              inputs=[input_text, temperature, top_p, top_k, image_prompt, result_text, hidden_image_hash],
+                              inputs=[input_text, temperature, top_p, top_k, image_prompt, result_text, hidden_image_hash, rank],
                               outputs=[input_text, result_text, hidden_image_hash])
             clear_button.click(fn=clear_fn, inputs=clear_button, outputs=[input_text, result_text, image_prompt])
             image_prompt.upload(fn=clear_fn2, inputs=clear_button, outputs=[result_text])
@@ -227,7 +235,9 @@ def main(args,
             print(f"Gradio version: {gr.__version__}")
 
         demo.queue(concurrency_count=10)
-        demo.launch()
+
+        if rank == 0:
+            demo.launch()
     else:
         while True:
             pass
