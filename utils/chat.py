@@ -82,11 +82,19 @@ def chat(image_path: Optional[List[str]],
         prompt, image_position, (torch_image, pil_img) = process_image(prompt, text_processor, img_processor,
                                                                        image=image)
 
+    print(f"get model devices")
+    for each_param in model.parameters():
+        print("dtype:", each_param.dtype)
+        print("device:", each_param.device)
+
     print(f"chat: prompt: {prompt}")
     print(f"chat: image_position: {image_position}")
     if torch_image is not None:
         assert type(torch_image) is dict
         if type(torch_image) is dict:
+            for k, v in torch_image.items():
+                print(k, type(v))
+
             for k in torch_image:
                 if type(torch_image[k]) is torch.Tensor and torch_image[k].dtype is not torch.int and torch_image[
                     k].dtype is not torch.long:
