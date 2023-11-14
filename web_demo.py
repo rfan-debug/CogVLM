@@ -92,15 +92,19 @@ def main(args,
             result_previous,
             hidden_image,
     ):
+        parameters_str = f"""
+            input params:
+            input_text: {input_text}
+            temperature: {temperature}
+            top_p: {top_p}
+            top_k: {top_k}
+            image_prompt: {image_prompt}
+            result_previous: {result_previous}
+            hidden_image: {hidden_image}
+        """
+
         print(
-            "input params:",
-            input_text,
-            temperature,
-            top_p,
-            top_k,
-            image_prompt,
-            result_previous,
-            hidden_image
+            parameters_str
         )
         result_text = [(ele[0], ele[1]) for ele in result_previous]
         for i in range(len(result_text) - 1, -1, -1):
@@ -125,6 +129,12 @@ def main(args,
                         torch.distributed.broadcast_object_list(result_text, src=0)
                     torch.distributed.broadcast_object_list(image_prompts, src=0)
                     torch.distributed.broadcast_object_list(pil_imgs, src=0)
+
+                    print("image_prompts:", image_prompts)
+                    print("result_texts:", result_text)
+                    print("input_texts:", input_texts)
+                    pil_img.save(f"temp_{rank}.png")
+
                 print("chat call started")
                 response, _, cache_image = chat(
                     image_path=image_prompts[0],
@@ -133,7 +143,7 @@ def main(args,
                     img_processor=image_processor,
                     query=input_texts[0],
                     history=result_text,
-                    image=pil_imgs[0],
+                    image=None,
                     max_length=2048,
                     top_p=top_p,
                     temperature=temperature,

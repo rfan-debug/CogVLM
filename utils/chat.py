@@ -81,6 +81,9 @@ def chat(image_path: Optional[List[str]],
     else:
         prompt, image_position, (torch_image, pil_img) = process_image(prompt, text_processor, img_processor,
                                                                        image=image)
+
+    print(f"chat: prompt: {prompt}")
+    print(f"chat: image_position: {image_position}")
     if torch_image is not None:
         assert type(torch_image) is dict
         if type(torch_image) is dict:
@@ -102,6 +105,8 @@ def chat(image_path: Optional[List[str]],
         if not torch_image or hasattr(text_processor, 'no_eoi'):
             new_prompt = new_prompt.replace(text_processor.tokenizer.eoi, '', 1)
         inputs_dic = text_processor(new_prompt)
+
+        print(new_prompt)
         for k in inputs_dic:
             if type(inputs_dic[k]) is torch.Tensor and inputs_dic[k].dtype is not torch.int and inputs_dic[
                 k].dtype is not torch.long:
@@ -128,6 +133,8 @@ def chat(image_path: Optional[List[str]],
         inputs = {'vision_' + k: v for k, v in torch_image.items()}
         inputs_dic.pop('input_ids')
         inputs = {**inputs, **inputs_dic}
+
+    print("chat:inputs:", inputs)
     output = filling_sequence(
         model, seq,
         batch_size=1,
