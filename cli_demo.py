@@ -83,6 +83,7 @@ def main():
                 else:
                     image_path = [None]
             if world_size > 1:
+                print(image_path)
                 torch.distributed.broadcast_object_list(image_path, 0)
             image_path = image_path[0]
             assert image_path is not None
@@ -151,6 +152,7 @@ def main():
                     else:
                         query = [None]
                 if world_size > 1:
+                    print(query)
                     torch.distributed.broadcast_object_list(query, 0)
                 query = query[0]
                 assert query is not None
