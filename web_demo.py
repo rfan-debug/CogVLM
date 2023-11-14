@@ -91,8 +91,9 @@ def main(args,
             image_prompt,
             result_previous,
             hidden_image,
-            rank,
     ):
+
+
         parameters_str = f"""
             input params:
             input_text: {input_text}
@@ -224,10 +225,10 @@ def main(args,
 
             gr.Markdown(MAINTENANCE_NOTICE1)
             run_button.click(fn=call_predict,
-                             inputs=[input_text, temperature, top_p, top_k, image_prompt, result_text, hidden_image_hash, rank],
+                             inputs=[input_text, temperature, top_p, top_k, image_prompt, result_text, hidden_image_hash],
                              outputs=[input_text, result_text, hidden_image_hash])
             input_text.submit(fn=call_predict,
-                              inputs=[input_text, temperature, top_p, top_k, image_prompt, result_text, hidden_image_hash, rank],
+                              inputs=[input_text, temperature, top_p, top_k, image_prompt, result_text, hidden_image_hash],
                               outputs=[input_text, result_text, hidden_image_hash])
             clear_button.click(fn=clear_fn, inputs=clear_button, outputs=[input_text, result_text, image_prompt])
             image_prompt.upload(fn=clear_fn2, inputs=clear_button, outputs=[result_text])
