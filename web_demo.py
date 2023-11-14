@@ -181,7 +181,7 @@ def main(args,
         return "", result_text, hidden_image
 
 
-    if rank >= 0:
+    if rank == 0:
         print(f"This rank: {rank}, running the gradio UI")
         examples = []
         example_ids = list(range(3)) if not is_grounding else list(range(3, 6, 1))
@@ -236,9 +236,7 @@ def main(args,
             print(f"Gradio version: {gr.__version__}")
 
         demo.queue(concurrency_count=10)
-
-        if rank == 0:
-            demo.launch()
+        demo.launch()
     else:
         while True:
             pass
