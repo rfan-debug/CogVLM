@@ -161,6 +161,12 @@ if __name__ == '__main__':
     print(f"local_rank: {local_rank}")
     parser = CogVLMModel.add_model_specific_args(parser)
     args = parser.parse_args()
+
+    if not torch.distributed.is_initialized():
+        torch.distributed.init_process_group(
+            backend="nccl",
+            world_size=2,
+        )
     # Load models
     # model, image_processor, text_processor_infer = load_model(args, rank, world_size)
 
