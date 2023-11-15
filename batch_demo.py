@@ -188,9 +188,7 @@ if __name__ == '__main__':
                 f"1. Please list all objects you see in the above image. Make sure including the product, {product_description} \n"
                 + f"2. What object supports the product, `{product_description}`? \n"
                 + "3. What side is this product object anchored on? Choose from (top, bottom, left, right) or (floating) when there is no clear anchoring."
-                + "4. Is the supporting surface flat?\n"
-                + f"5. Does the objects in the foreground have the same support as the product, `{product_description}`?\n"
-                + "6. What is the size estimation of the product, `product_description`, in inches?\n"
+                + "4. What is the size estimation of the product, `product_description`, in inches?\n"
         )
 
         if os.path.isfile(image_prompt):
