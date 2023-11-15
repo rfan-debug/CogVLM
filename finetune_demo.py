@@ -147,7 +147,7 @@ def forward_step_eval(data_iterator, model, args, timers):
             "acc_w/o_case": [],
         }
         for pred, label in zip(decoded_preds, decoded_labels):
-            if args.RANK == 0:
+            if args.rank == 0:
                 print('pred', pred, 'label', label, flush=True)
             if pred == label:
                 score_dict['acc'].append(1.)
