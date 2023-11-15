@@ -153,21 +153,22 @@ if __name__ == '__main__':
     output_lines = []
     for i in range(1, 35):
         image_prompt = f"product/{i}-bg.png"
-        answer = run_predict(args,
-                             model,
-                             image_processor,
-                             text_processor_infer,
-                             rank,
-                             input_text="Could you describe this image in 300 tokens?",
-                             temperature=config.MODEL_TEMP,
-                             top_p=config.TOP_P,
-                             top_k=config.TOP_K,
-                             image_prompt=image_prompt,
-                             )
-        output_lines.append(dict(
-            file_name=image_prompt,
-            description=answer
-        ))
+        if os.path.isfile(image_prompt):
+            answer = run_predict(args,
+                                 model,
+                                 image_processor,
+                                 text_processor_infer,
+                                 rank,
+                                 input_text="Could you describe this image in 300 tokens?",
+                                 temperature=config.MODEL_TEMP,
+                                 top_p=config.TOP_P,
+                                 top_k=config.TOP_K,
+                                 image_prompt=image_prompt,
+                                 )
+            output_lines.append(dict(
+                file_name=image_prompt,
+                description=answer
+            ))
 
     if rank == 0:
         with open("output.jsonl") as fp:
