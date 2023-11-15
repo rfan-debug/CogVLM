@@ -92,10 +92,6 @@ def run_predict(args,
                 torch.distributed.broadcast_object_list(image_prompts, src=0)
                 torch.distributed.broadcast_object_list(pil_imgs, src=0)
 
-                print("image_prompts:", image_prompts)
-                print("input_texts:", input_texts)
-
-            print(f"Calling chat from rank={rank}")
             response, _, cache_image = chat(
                 image_path=image_prompts[0],
                 model=model,
@@ -112,7 +108,6 @@ def run_predict(args,
                                                                               "invalid_slices") else [],
                 no_prompt=False
             )
-            print("chat call finished")
     except Exception as e:
         print("error message", e)
         traceback.print_exc()
@@ -123,7 +118,6 @@ def run_predict(args,
         new_answer = answer.replace(input_text, "")
     else:
         new_answer = answer
-
     return new_answer
 
 
