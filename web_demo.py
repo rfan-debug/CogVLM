@@ -144,7 +144,7 @@ def main(args,
                     print("input_texts:", input_texts)
                     pil_img.save(f"temp_{rank}.png")
 
-                print("chat call started")
+                print(f"Calling chat from rank={rank}")
                 response, _, cache_image = chat(
                     image_path=image_prompts[0],
                     model=model,
