@@ -183,30 +183,35 @@ if __name__ == '__main__':
     for entry in input_data:
         product_description = entry.product_description
         image_prompt = entry.image_path
-        question = (
-                "Answer the following questions:\n"
-                f"1. Please list all objects you see in the above image. Make sure including the product, {product_description} \n"
-                + f"2. What object supports the product, `{product_description}`? \n"
-                + "3. What side is this product object anchored on? Choose from (top, bottom, left, right) or (floating) when there is no clear anchoring."
-                + "4. What is the size estimation of the product, `product_description`, in inches?\n"
-        )
+        questions = [
+                f"Please list all objects you see in the above image. Make sure including the product, {product_description}",
+                f"What object supports the product, `{product_description}`?",
+                f"What side is this product object, `{product_description}`, anchored on? Choose from (top, bottom, left, right) or (floating) when there is no clear anchoring.",
+                "Is the supporting surface flat?",
+                f"Does the objects in the foreground have the same support as the product, `{product_description}`?",
+                f"What is the size estimation of the product, `{product_description}`, in inches?",
+        ]
 
         if os.path.isfile(image_prompt):
-            answer = run_predict(args,
-                                 model,
-                                 image_processor,
-                                 text_processor_infer,
-                                 rank,
-                                 input_text=question,
-                                 temperature=config.MODEL_TEMP,
-                                 top_p=config.TOP_P,
-                                 top_k=config.TOP_K,
-                                 image_prompt=image_prompt,
-                                 )
+            answers = []
+            # Ask question one by one. Otherwise, the LM might suffer from hallucination.
+            for question in questions:
+                answer = run_predict(args,
+                                     model,
+                                     image_processor,
+                                     text_processor_infer,
+                                     rank,
+                                     input_text=question,
+                                     temperature=config.MODEL_TEMP,
+                                     top_p=config.TOP_P,
+                                     top_k=config.TOP_K,
+                                     image_prompt=image_prompt,
+                                     )
+                answers.append(answer)
             output_lines.append(dict(
                 file_name=image_prompt,
-                description=answer,
-                question=question,
+                description="\n".join(answers),
+                question=questions,
             ))
 
     if rank == 0:
