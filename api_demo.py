@@ -1,5 +1,7 @@
 
 import os, sys
+from typing import Union
+
 import torch.distributed
 import traceback
 
@@ -23,6 +25,13 @@ RANK = int(os.environ.get('RANK', 0))
 WORLD_SIZE = int(os.environ.get('WORLD_SIZE', 1))
 LOCAL_RANK = int(os.environ.get('LOCAL_RANK', None))
 
+
+app = FastAPI()
+
+
+@app.get("/")
+def read_root():
+    return {"Message": "Welcome to CogVLM FastAPI."}
 
 def process_image_without_resize(image_prompt):
     image = Image.open(image_prompt)
@@ -61,125 +70,123 @@ def load_model(args):
     return model, image_processor, text_processor_infer
 
 
-def run_main(args,
-             model,
-             image_processor,
-             text_processor_infer,
-             ):
-    is_grounding = 'grounding' in args.from_pretrained
-    def call_predict(
-            input_text,
-            temperature,
-            top_p,
-            top_k,
-            image_prompt,
-            result_previous,
-            hidden_image,
-    ):
-        parameters_str = f"""
-            input params:
-            input_text: {input_text}
-            temperature: {temperature}
-            top_p: {top_p}
-            top_k: {top_k}
-            image_prompt: {image_prompt}
-            result_previous: {result_previous}
-            hidden_image: {hidden_image}
-        """
+def call_predict(
+        input_text,
+        temperature,
+        top_p,
+        top_k,
+        image_prompt,
+        result_previous,
+        hidden_image,
+        is_grounding,
+):
+    parameters_str = f"""
+        input params:
+        input_text: {input_text}
+        temperature: {temperature}
+        top_p: {top_p}
+        top_k: {top_k}
+        image_prompt: {image_prompt}
+        result_previous: {result_previous}
+        hidden_image: {hidden_image}
+    """
 
-        print(
-            parameters_str
-        )
-        result_text = [(ele[0], ele[1]) for ele in result_previous]
-        for i in range(len(result_text) - 1, -1, -1):
-            if result_text[i][0] == "" or result_text[i][0] == None:
-                del result_text[i]
-        print(f"history {result_text}")
+    print(
+        parameters_str
+    )
+    result_text = [(ele[0], ele[1]) for ele in result_previous]
+    for i in range(len(result_text) - 1, -1, -1):
+        if result_text[i][0] == "" or result_text[i][0] == None:
+            del result_text[i]
+    print(f"history {result_text}")
 
-        try:
-            with torch.no_grad():
-                pil_img, image_path_grounding = process_image_without_resize(image_prompt)
+    try:
+        with torch.no_grad():
+            pil_img, image_path_grounding = process_image_without_resize(image_prompt)
 
-                # Pull all necessary data into list so we can broadcast them through `torch.distributed.broadcast_object_list`.
-                if RANK == 0:
-                    image_prompts = [image_prompt]
-                    input_texts = [input_text]
-                    pil_imgs = [pil_img]
-                else:
-                    image_prompts = [None]
-                    input_texts = [None]
-                    pil_imgs = [None]
+            # Pull all necessary data into list so we can broadcast them through `torch.distributed.broadcast_object_list`.
+            if RANK == 0:
+                image_prompts = [image_prompt]
+                input_texts = [input_text]
+                pil_imgs = [pil_img]
+            else:
+                image_prompts = [None]
+                input_texts = [None]
+                pil_imgs = [None]
 
 
-                print("result_text: ", result_text)
+            print("result_text: ", result_text)
 
-                if WORLD_SIZE > 1:
-                    torch.distributed.broadcast_object_list(input_texts, src=0)
-                    if len(result_text) > 0:
-                        torch.distributed.broadcast_object_list(result_text, src=0)
-                    torch.distributed.broadcast_object_list(image_prompts, src=0)
-                    torch.distributed.broadcast_object_list(pil_imgs, src=0)
+            if WORLD_SIZE > 1:
+                torch.distributed.broadcast_object_list(input_texts, src=0)
+                if len(result_text) > 0:
+                    torch.distributed.broadcast_object_list(result_text, src=0)
+                torch.distributed.broadcast_object_list(image_prompts, src=0)
+                torch.distributed.broadcast_object_list(pil_imgs, src=0)
 
-                    print("image_prompts:", image_prompts)
-                    print("result_texts:", result_text)
-                    print("input_texts:", input_texts)
-                    pil_img.save(f"temp_{RANK}.png")
+                print("image_prompts:", image_prompts)
+                print("result_texts:", result_text)
+                print("input_texts:", input_texts)
+                pil_img.save(f"temp_{RANK}.png")
 
-                if RANK == 1:
-                    time.sleep(5)
-                print(f"Calling chat from rank={RANK}")
-                response, _, cache_image = chat(
-                    image_path=image_prompts[0],
-                    model=model,
-                    text_processor=text_processor_infer,
-                    img_processor=image_processor,
-                    query=input_texts[0],
-                    history=result_text,
-                    image=None,
-                    max_length=2048,
-                    top_p=top_p,
-                    temperature=temperature,
-                    top_k=top_k,
-                    invalid_slices=text_processor_infer.invalid_slices if hasattr(text_processor_infer, "invalid_slices") else [],
-                    no_prompt=False
-                )
-                print("chat call finished")
-        except Exception as e:
-            print("error message", e)
-            traceback.print_exc()
-            result_text.append((input_text, 'Timeout! Please wait a few minutes and retry.'))
-            return "", result_text, hidden_image
-
-        answer = response
-        if is_grounding:
-            parse_response(pil_img, answer, image_path_grounding)
-            new_answer = answer.replace(input_text, "")
-            result_text.append((input_text, new_answer))
-            result_text.append((None, (image_path_grounding,)))
-        else:
-            result_text.append((input_text, answer))
-
-        print(result_text)
-        print('Chat task finished')
+            if RANK == 1:
+                time.sleep(5)
+            print(f"Calling chat from rank={RANK}")
+            response, _, cache_image = chat(
+                image_path=image_prompts[0],
+                model=model,
+                text_processor=text_processor_infer,
+                img_processor=image_processor,
+                query=input_texts[0],
+                history=result_text,
+                image=None,
+                max_length=2048,
+                top_p=top_p,
+                temperature=temperature,
+                top_k=top_k,
+                invalid_slices=text_processor_infer.invalid_slices if hasattr(text_processor_infer, "invalid_slices") else [],
+                no_prompt=False
+            )
+            print("chat call finished")
+    except Exception as e:
+        print("error message", e)
+        traceback.print_exc()
+        result_text.append((input_text, 'Timeout! Please wait a few minutes and retry.'))
         return "", result_text, hidden_image
 
+    answer = response
+    if is_grounding:
+        parse_response(pil_img, answer, image_path_grounding)
+        new_answer = answer.replace(input_text, "")
+        result_text.append((input_text, new_answer))
+        result_text.append((None, (image_path_grounding,)))
+    else:
+        result_text.append((input_text, answer))
 
-    print(f"This rank: {RANK}, running the gradio UI")
+    print(result_text)
+    print('Chat task finished')
+    return "", result_text, hidden_image
+
+
+@app.get("/inference/{item_id}")
+def inference_image(item_id: int, q: Union[str, None] = None):
+    is_grounding = 'grounding' in args.from_pretrained
+    print(f"This rank: {RANK}, running inference on fastapi")
     input_text, result_text, hidden_image_hash = call_predict(
         input_text="Describe this image",
         temperature=0.7,
         top_p=0.4,
         top_k=10,
-        image_prompt="./examples/6.jpg",
+        image_prompt=f"./examples/{item_id}.jpg",
         result_previous=[['', 'Hi, What do you want to know about this image?']],
         hidden_image=None,
+        is_grounding=is_grounding,
     )
-    print("input_text: ", input_text)
-    print("result_text: ", result_text)
-    print("hidden_image_hash: ", hidden_image_hash)
 
-    while True:
-        pass
+    return {
+        "input_text": input_text,
+        "result_text": result_text,
+    }
 
 
 
@@ -198,10 +205,9 @@ if __name__ == '__main__':
     parser.add_argument("--no_prompt", action='store_true', help='Sometimes there is no prompt in stage 1')
     parser.add_argument("--fp16", action="store_true")
     parser.add_argument("--bf16", action="store_true")
-    args = parser.parse_args()
-
     parser = CogVLMModel.add_model_specific_args(parser)
     args = parser.parse_args()
     # Load models
     model, image_processor, text_processor_infer = load_model(args)
-    run_main(args, model, image_processor, text_processor_infer)
+
+    print(f"model loading done on RANK={RANK}")
