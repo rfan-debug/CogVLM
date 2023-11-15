@@ -134,13 +134,16 @@ def call_predict(
             print("result_text: ", result_text)
 
             if WORLD_SIZE > 1:
-                torch.distributed.broadcast_object_list(input_texts, src=0)
-                if len(result_text) > 0:
-                    torch.distributed.broadcast_object_list(result_text, src=0)
-                torch.distributed.broadcast_object_list(image_prompts, src=0)
-                torch.distributed.broadcast_object_list(pil_imgs, src=0)
+                if RANK == 0:
+                    torch.distributed.broadcast_object_list(input_texts, src=0)
+                    if len(result_text) > 0:
+                        torch.distributed.broadcast_object_list(result_text, src=0)
+                    torch.distributed.broadcast_object_list(image_prompts, src=0)
+                    torch.distributed.broadcast_object_list(pil_imgs, src=0)
+                else:
+                    print("Waiting for broadcasting from source device")
 
-                print("image_prompts:", image_prompts)
+                print(f"image_prompts: {image_prompts}")
                 print("result_texts:", result_text)
                 print("input_texts:", input_texts)
                 pil_img.save(f"temp_{RANK}.png")
