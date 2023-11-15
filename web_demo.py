@@ -259,6 +259,8 @@ if __name__ == '__main__':
     args = parser.parse_args()
     rank = int(os.environ.get('RANK', 0))
     world_size = int(os.environ.get('WORLD_SIZE', 1))
+    local_rank = int(os.environ.get('LOCAL_RANK', None))
+    print(f"local_rank: {local_rank}")
     parser = CogVLMModel.add_model_specific_args(parser)
     args = parser.parse_args()
     # Load models
