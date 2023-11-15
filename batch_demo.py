@@ -129,7 +129,7 @@ def run_predict(args,
 
 def prepare_data() -> List[DataEntry]:
     res = []
-    with open("source_data.json") as fp:
+    with open("source_data.json", "r") as fp:
         data_list = json.load(fp)
         for each in data_list:
             res.append(
@@ -171,7 +171,8 @@ if __name__ == '__main__':
     if rank == 0:
         input_data = prepare_data()
     else:
-        input_data = [None]
+        data_length = len(prepare_data())
+        input_data = [None] * data_length
 
     if world_size > 1:
         torch.distributed.broadcast_object_list(input_data, src=0)
