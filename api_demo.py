@@ -125,6 +125,8 @@ def run_main(args,
                     print("input_texts:", input_texts)
                     pil_img.save(f"temp_{RANK}.png")
 
+                if RANK == 1:
+                    time.sleep(5)
                 print(f"Calling chat from rank={RANK}")
                 response, _, cache_image = chat(
                     image_path=image_prompts[0],
