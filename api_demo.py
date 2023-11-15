@@ -26,13 +26,6 @@ WORLD_SIZE = int(os.environ.get('WORLD_SIZE', 1))
 LOCAL_RANK = int(os.environ.get('LOCAL_RANK', None))
 
 
-app = FastAPI()
-
-
-@app.get("/")
-def read_root():
-    return {"Message": "Welcome to CogVLM FastAPI."}
-
 def process_image_without_resize(image_prompt):
     image = Image.open(image_prompt)
     timestamp = int(time.time())
@@ -69,6 +62,29 @@ def load_model(args):
     print(f"Model loading finished from {RANK} with world size {WORLD_SIZE}\n.")
     return model, image_processor, text_processor_infer
 
+
+## Parse args and load models
+import argparse
+
+parser = argparse.ArgumentParser()
+parser.add_argument("--max_length", type=int, default=2048, help='max length of the total sequence')
+parser.add_argument("--top_p", type=float, default=0.4, help='top p for nucleus sampling')
+parser.add_argument("--top_k", type=int, default=1, help='top k for top k sampling')
+parser.add_argument("--temperature", type=float, default=.8, help='temperature for sampling')
+parser.add_argument("--english", action='store_true', help='only output English')
+parser.add_argument("--version", type=str, default="chat", help='version to interact with')
+parser.add_argument("--from_pretrained", type=str, default="cogvlm-chat", help='pretrained ckpt')
+parser.add_argument("--local_tokenizer", type=str, default="lmsys/vicuna-7b-v1.5", help='tokenizer path')
+parser.add_argument("--no_prompt", action='store_true', help='Sometimes there is no prompt in stage 1')
+parser.add_argument("--fp16", action="store_true")
+parser.add_argument("--bf16", action="store_true")
+parser = CogVLMModel.add_model_specific_args(parser)
+args = parser.parse_args()
+# Load models
+model, image_processor, text_processor_infer = load_model(args)
+
+print(f"model loading done on RANK={RANK}")
+##
 
 def call_predict(
         input_text,
@@ -168,6 +184,14 @@ def call_predict(
     return "", result_text, hidden_image
 
 
+
+app = FastAPI()
+
+@app.get("/")
+def read_root():
+    return {"Message": "Welcome to CogVLM FastAPI."}
+
+
 @app.get("/inference/{item_id}")
 def inference_image(item_id: int, q: Union[str, None] = None):
     is_grounding = 'grounding' in args.from_pretrained
@@ -188,26 +212,3 @@ def inference_image(item_id: int, q: Union[str, None] = None):
         "result_text": result_text,
     }
 
-
-
-if __name__ == '__main__':
-    import argparse
-
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--max_length", type=int, default=2048, help='max length of the total sequence')
-    parser.add_argument("--top_p", type=float, default=0.4, help='top p for nucleus sampling')
-    parser.add_argument("--top_k", type=int, default=1, help='top k for top k sampling')
-    parser.add_argument("--temperature", type=float, default=.8, help='temperature for sampling')
-    parser.add_argument("--english", action='store_true', help='only output English')
-    parser.add_argument("--version", type=str, default="chat", help='version to interact with')
-    parser.add_argument("--from_pretrained", type=str, default="cogvlm-chat", help='pretrained ckpt')
-    parser.add_argument("--local_tokenizer", type=str, default="lmsys/vicuna-7b-v1.5", help='tokenizer path')
-    parser.add_argument("--no_prompt", action='store_true', help='Sometimes there is no prompt in stage 1')
-    parser.add_argument("--fp16", action="store_true")
-    parser.add_argument("--bf16", action="store_true")
-    parser = CogVLMModel.add_model_specific_args(parser)
-    args = parser.parse_args()
-    # Load models
-    model, image_processor, text_processor_infer = load_model(args)
-
-    print(f"model loading done on RANK={RANK}")
