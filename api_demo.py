@@ -119,36 +119,16 @@ def call_predict(
     try:
         with torch.no_grad():
             pil_img, image_path_grounding = process_image_without_resize(image_prompt)
-
-            # Pull all necessary data into list so we can broadcast them through `torch.distributed.broadcast_object_list`.
-            image_prompts = [image_prompt]
-            input_texts = [input_text]
-            pil_imgs = [pil_img]
-
-            print("result_text: ", result_text)
-
-            if WORLD_SIZE > 1:
-                print(f"broadcasting at {RANK}")
-                torch.distributed.broadcast_object_list(input_texts, src=0)
-                if len(result_text) > 0:
-                    torch.distributed.broadcast_object_list(result_text, src=0)
-                torch.distributed.broadcast_object_list(image_prompts, src=0)
-                torch.distributed.broadcast_object_list(pil_imgs, src=0)
-                print(f"broadcasting finished at {RANK}")
-
-
-                print(f"image_prompts: {image_prompts}")
-                print("result_texts:", result_text)
-                print("input_texts:", input_texts)
-                pil_img.save(f"temp_{RANK}.png")
+            # We sent the message to two process (cuda:0, cuda:1) through network interfaces separately, so we don't
+            # run `torch.distributed.broadcast_object_list` in this code. 
 
             print(f"Calling chat from rank={RANK}")
             response, _, cache_image = chat(
-                image_path=image_prompts[0],
+                image_path=image_prompt,
                 model=model,
                 text_processor=text_processor_infer,
                 img_processor=image_processor,
-                query=input_texts[0],
+                query=input_text,
                 history=result_text,
                 image=None,
                 max_length=2048,
