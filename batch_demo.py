@@ -162,7 +162,7 @@ if __name__ == '__main__':
     parser = CogVLMModel.add_model_specific_args(parser)
     args = parser.parse_args()
     # Load models
-    model, image_processor, text_processor_infer = load_model(args, rank, world_size)
+    # model, image_processor, text_processor_infer = load_model(args, rank, world_size)
 
 
     if rank == 0:
