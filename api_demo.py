@@ -176,6 +176,9 @@ def run_main(args,
     print("result_text: ", result_text)
     print("hidden_image_hash: ", hidden_image_hash)
 
+    while True:
+        pass
+
 
 
 if __name__ == '__main__':
