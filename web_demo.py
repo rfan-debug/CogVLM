@@ -182,61 +182,63 @@ def main(args,
 
 
     print(f"This rank: {rank}, running the gradio UI")
-    examples = []
-    example_ids = list(range(3)) if not is_grounding else list(range(3, 6, 1))
-    with open("./examples/example_inputs.jsonl") as f:
-        for i, line in enumerate(f):
-            if i not in example_ids: continue
-            data = json.loads(line)
-            examples.append(data)
 
-    with gr.Blocks(css='style.css') as demo:
+    input_text, result_text, hidden_image_hash = call_predict(
+        input_text="Describe this image",
+        temperature=0.7,
+        top_p=0.4,
+        top_k=10,
+        image_prompt="./example/6.jpg",
+        result_previous=[['', 'Hi, What do you want to know about this image?']],
+        hidden_image=None,
+    )
 
-        gr.Markdown(DESCRIPTION)
-        gr.Markdown(NOTES)
+    print("input_text: ", input_text)
+    print("result_text: ", result_text)
+    print("hidden_image_hash: ", hidden_image_hash)
 
-        with gr.Row():
-            with gr.Column(scale=4):
-                with gr.Group():
-                    input_text = gr.Textbox(label='Input Text',
-                                            placeholder='Please enter text prompt below and press ENTER.')
-                    with gr.Row():
-                        run_button = gr.Button('Generate')
-                        clear_button = gr.Button('Clear')
-
-                    image_prompt = gr.Image(type="filepath", label="Image Prompt", value=None)
-
-                with gr.Row():
-                    temperature = gr.Slider(maximum=1, value=0.8, minimum=0, label='Temperature')
-                    top_p = gr.Slider(maximum=1, value=0.4, minimum=0, label='Top P')
-                    top_k = gr.Slider(maximum=100, value=10, minimum=1, step=1, label='Top K')
-
-            with gr.Column(scale=5):
-                result_text = gr.components.Chatbot(
-                    label='Multi-round conversation History',
-                    value=[("", "Hi, What do you want to know about this image?")]).style(height=550)
-                hidden_image_hash = gr.Textbox(visible=False)
-
-        gr_examples = gr.Examples(examples=[[example["text"], example["image"]] for example in examples],
-                                  inputs=[input_text, image_prompt],
-                                  label="Example Inputs (Click to insert an examplet into the input box)",
-                                  examples_per_page=6)
-
-        gr.Markdown(MAINTENANCE_NOTICE1)
-        run_button.click(fn=call_predict,
-                         inputs=[input_text, temperature, top_p, top_k, image_prompt, result_text, hidden_image_hash],
-                         outputs=[input_text, result_text, hidden_image_hash])
-        input_text.submit(fn=call_predict,
-                          inputs=[input_text, temperature, top_p, top_k, image_prompt, result_text, hidden_image_hash],
-                          outputs=[input_text, result_text, hidden_image_hash])
-        clear_button.click(fn=clear_fn, inputs=clear_button, outputs=[input_text, result_text, image_prompt])
-        image_prompt.upload(fn=clear_fn2, inputs=clear_button, outputs=[result_text])
-        image_prompt.clear(fn=clear_fn2, inputs=clear_button, outputs=[result_text])
-        print(f"Gradio version: {gr.__version__}")
-
-    demo.queue(concurrency_count=10)
-    demo.launch()
-
+    # with gr.Blocks(css='style.css') as demo:
+    #
+    #     gr.Markdown(DESCRIPTION)
+    #     gr.Markdown(NOTES)
+    #
+    #     with gr.Row():
+    #         with gr.Column(scale=4):
+    #             with gr.Group():
+    #                 input_text = gr.Textbox(label='Input Text',
+    #                                         placeholder='Please enter text prompt below and press ENTER.')
+    #                 with gr.Row():
+    #                     run_button = gr.Button('Generate')
+    #                     clear_button = gr.Button('Clear')
+    #
+    #                 image_prompt = gr.Image(type="filepath", label="Image Prompt", value=None)
+    #
+    #             with gr.Row():
+    #                 temperature = gr.Slider(maximum=1, value=0.8, minimum=0, label='Temperature')
+    #                 top_p = gr.Slider(maximum=1, value=0.4, minimum=0, label='Top P')
+    #                 top_k = gr.Slider(maximum=100, value=10, minimum=1, step=1, label='Top K')
+    #
+    #         with gr.Column(scale=5):
+    #             result_text = gr.components.Chatbot(
+    #                 label='Multi-round conversation History',
+    #                 value=[("", "Hi, What do you want to know about this image?")]).style(height=550)
+    #             hidden_image_hash = gr.Textbox(visible=False)
+    #
+    #
+    #     gr.Markdown(MAINTENANCE_NOTICE1)
+    #     run_button.click(fn=call_predict,
+    #                      inputs=[input_text, temperature, top_p, top_k, image_prompt, result_text, hidden_image_hash],
+    #                      outputs=[input_text, result_text, hidden_image_hash])
+    #     input_text.submit(fn=call_predict,
+    #                       inputs=[input_text, temperature, top_p, top_k, image_prompt, result_text, hidden_image_hash],
+    #                       outputs=[input_text, result_text, hidden_image_hash])
+    #     clear_button.click(fn=clear_fn, inputs=clear_button, outputs=[input_text, result_text, image_prompt])
+    #     image_prompt.upload(fn=clear_fn2, inputs=clear_button, outputs=[result_text])
+    #     image_prompt.clear(fn=clear_fn2, inputs=clear_button, outputs=[result_text])
+    #     print(f"Gradio version: {gr.__version__}")
+    #
+    # demo.queue(concurrency_count=10)
+    # demo.launch()
 
 
 if __name__ == '__main__':
