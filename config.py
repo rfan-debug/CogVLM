@@ -1,0 +1,3 @@
+MODEL_TEMP = 0.7
+TOP_P = 0.4
+TOP_K = 10
