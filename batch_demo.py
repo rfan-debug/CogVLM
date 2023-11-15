@@ -171,6 +171,6 @@ if __name__ == '__main__':
             ))
 
     if rank == 0:
-        with open("output.jsonl") as fp:
+        with open("output.jsonl", "w") as fp:
             for each in output_lines:
                 fp.write(json.dumps(each) + "\n")
