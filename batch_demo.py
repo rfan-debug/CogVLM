@@ -164,7 +164,6 @@ if __name__ == '__main__':
 
     if not torch.distributed.is_initialized():
         torch.distributed.init_process_group(
-            backend="nccl",
             world_size=2,
         )
     # Load models
