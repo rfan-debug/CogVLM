@@ -180,7 +180,7 @@ def main(args,
         print('Chat task finished')
         return "", result_text, hidden_image
 
-    
+
     print(f"This rank: {rank}, running the gradio UI")
     examples = []
     example_ids = list(range(3)) if not is_grounding else list(range(3, 6, 1))
