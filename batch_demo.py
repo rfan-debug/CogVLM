@@ -179,41 +179,40 @@ if __name__ == '__main__':
 
 
     print(f"rank {rank}:", input_data)
+    output_lines = []
+    for entry in input_data:
+        product_description = entry.product_description
+        image_prompt = entry.image_path
+        question = (
+                f"1. Please list all objects you see in the above image. Make sure including the product, {product_description} \n"
+                + f"2. What object supports the product, `{product_description}`? \n"
+                + "3. What side is this product object anchored on? Choose from (top, bottom, left, right) or (floating) when there is no clear anchoring."
+                + "4. Is the supporting surface flat?\n"
+                + f"5. Does the objects in the foreground have the same support as the product, `{product_description}`?\n"
+                + "6. What is the size estimation of the product, `product_description`, in inches?\n"
+                + "Format answers of these questions in json:\n"
+                + "`all_objects`: list; `supporting_object`: str; anchored_side: str; is_flat: bool; same_support: bool; product_height: float; product_width: float;"
+        )
 
+        if os.path.isfile(image_prompt):
+            answer = run_predict(args,
+                                 model,
+                                 image_processor,
+                                 text_processor_infer,
+                                 rank,
+                                 input_text="Could you describe this image in 300 tokens?",
+                                 temperature=config.MODEL_TEMP,
+                                 top_p=config.TOP_P,
+                                 top_k=config.TOP_K,
+                                 image_prompt=image_prompt,
+                                 )
+            output_lines.append(dict(
+                file_name=image_prompt,
+                description=answer,
+                question=question,
+            ))
 
-    # output_lines = []
-    # for entry in input_data:
-    #     product_description = entry.product_description
-    #     image_prompt = entry.image_path
-    #     question = (
-    #             f"1. Please list all objects you see in the above image. Make sure including the product, {product_description} \n"
-    #             + f"2. What object supports the product, `{product_description}`? \n"
-    #             + "3. What side is this product object anchored on? Choose from (top, bottom, left, right) or (floating) when there is no clear anchoring."
-    #             + "4. Is the supporting surface flat?\n"
-    #             + f"5. Does the objects in the foreground have the same support as the product, `{product_description}`?\n"
-    #             + "6. What is the size estimation of the product, `product_description`, in inches?\n"
-    #             + "Format answers of these questions in json:\n"
-    #             + "`all_objects`: list; `supporting_object`: str; anchored_side: str; is_flat: bool; same_support: bool; product_height: float; product_width: float;"
-    #     )
-    #
-    #     if os.path.isfile(image_prompt):
-    #         answer = run_predict(args,
-    #                              model,
-    #                              image_processor,
-    #                              text_processor_infer,
-    #                              rank,
-    #                              input_text="Could you describe this image in 300 tokens?",
-    #                              temperature=config.MODEL_TEMP,
-    #                              top_p=config.TOP_P,
-    #                              top_k=config.TOP_K,
-    #                              image_prompt=image_prompt,
-    #                              )
-    #         output_lines.append(dict(
-    #             file_name=image_prompt,
-    #             description=answer
-    #         ))
-    #
-    # if rank == 0:
-    #     with open("output.jsonl", "w") as fp:
-    #         for each in output_lines:
-    #             fp.write(json.dumps(each) + "\n")
+    if rank == 0:
+        with open("output.jsonl", "w") as fp:
+            for each in output_lines:
+                fp.write(json.dumps(each) + "\n")
