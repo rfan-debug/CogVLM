@@ -178,7 +178,7 @@ if __name__ == '__main__':
         torch.distributed.broadcast_object_list(input_data, src=0)
 
 
-    print(f"rank {rank}:", input_data)
+    print(f"rank {rank}: input length:", len(input_data))
     output_lines = []
     for entry in input_data:
         product_description = entry.product_description
