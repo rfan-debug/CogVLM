@@ -228,8 +228,6 @@ def main(args,
 
             gr.Markdown(MAINTENANCE_NOTICE1)
 
-            print("image_prompt", image_prompt)
-
             # Add the trigger
             run_button.click(fn=call_predict,
                              inputs=[input_text, temperature, top_p, top_k, image_prompt, result_text, hidden_image_hash],
