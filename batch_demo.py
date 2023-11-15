@@ -186,6 +186,7 @@ if __name__ == '__main__':
                 f"What is the size estimation of the product, `{product_description}`, in inches?",
         ]
 
+        print(f"Surfacing {entry.image_path}")
         if os.path.isfile(image_prompt):
             answers = []
             # Ask question one by one. Otherwise, the LM might suffer from hallucination.
