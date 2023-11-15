@@ -121,14 +121,10 @@ def call_predict(
             pil_img, image_path_grounding = process_image_without_resize(image_prompt)
 
             # Pull all necessary data into list so we can broadcast them through `torch.distributed.broadcast_object_list`.
-            if RANK == 0:
-                image_prompts = [image_prompt]
-                input_texts = [input_text]
-                pil_imgs = [pil_img]
-            else:
-                image_prompts = [None]
-                input_texts = [None]
-                pil_imgs = [None]
+            image_prompts = [image_prompt]
+            input_texts = [input_text]
+            pil_imgs = [pil_img]
+
 
 
             print("result_text: ", result_text)
@@ -140,8 +136,10 @@ def call_predict(
                         torch.distributed.broadcast_object_list(result_text, src=0)
                     torch.distributed.broadcast_object_list(image_prompts, src=0)
                     torch.distributed.broadcast_object_list(pil_imgs, src=0)
-                else:
-                    print("Waiting for broadcasting from source device")
+                # else:
+                #     while True:
+                #         print("Waiting for broadcasting from source device")
+
 
                 print(f"image_prompts: {image_prompts}")
                 print("result_texts:", result_text)
