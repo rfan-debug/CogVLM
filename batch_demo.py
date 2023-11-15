@@ -200,7 +200,7 @@ if __name__ == '__main__':
                                  image_processor,
                                  text_processor_infer,
                                  rank,
-                                 input_text="Could you describe this image in 300 tokens?",
+                                 input_text=question,
                                  temperature=config.MODEL_TEMP,
                                  top_p=config.TOP_P,
                                  top_k=config.TOP_K,
