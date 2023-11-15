@@ -107,7 +107,7 @@ def main():
                     torch.distributed.broadcast_object_list(query, 0)
                 query = query[0]
                 assert query is not None
-            while True:
+            if True:
                 if query == "clear":
                     break
                 if query == "stop":
