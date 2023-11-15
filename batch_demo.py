@@ -1,4 +1,6 @@
 import os, sys
+from typing import List
+
 import torch.distributed
 import traceback
 
@@ -125,7 +127,7 @@ def run_predict(args,
     return new_answer
 
 
-def prepare_data():
+def prepare_data() -> List[DataEntry]:
     res = []
     with open("source_data.json") as fp:
         data_list = json.load(fp)
@@ -169,12 +171,13 @@ if __name__ == '__main__':
     if rank == 0:
         input_data = prepare_data()
     else:
-        input_data = []
+        input_data = [None]
 
     if world_size > 1:
         torch.distributed.broadcast_object_list(input_data, src=0)
 
-    print(f"rank {rank}:", input_data[0])
+
+    print(f"rank {rank}:", input_data)
 
 
     # output_lines = []
