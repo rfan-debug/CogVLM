@@ -188,7 +188,7 @@ def main(args,
         temperature=0.7,
         top_p=0.4,
         top_k=10,
-        image_prompt="./example/6.jpg",
+        image_prompt="./examples/6.jpg",
         result_previous=[['', 'Hi, What do you want to know about this image?']],
         hidden_image=None,
     )
