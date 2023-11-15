@@ -3,6 +3,7 @@ import torch.distributed
 import traceback
 
 import config
+from input_data_model import DataEntry
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -124,6 +125,20 @@ def run_predict(args,
     return new_answer
 
 
+def prepare_data():
+    res = []
+    with open("source_data.json") as fp:
+        data_list = json.load(fp)
+        for each in data_list:
+            res.append(
+                DataEntry(
+                    image_path = each["complete_image"].replace("gs://dev-test-brand-abc123/source_images/", "./product/"),
+                    product_description=each["product_description"],
+                )
+            )
+
+    return res
+
 if __name__ == '__main__':
     import argparse
 
@@ -149,27 +164,51 @@ if __name__ == '__main__':
     # Load models
     model, image_processor, text_processor_infer = load_model(args, rank, world_size)
 
-    output_lines = []
-    for i in range(1, 35):
-        image_prompt = f"product/{i}-bg.png"
-        if os.path.isfile(image_prompt):
-            answer = run_predict(args,
-                                 model,
-                                 image_processor,
-                                 text_processor_infer,
-                                 rank,
-                                 input_text="Could you describe this image in 300 tokens?",
-                                 temperature=config.MODEL_TEMP,
-                                 top_p=config.TOP_P,
-                                 top_k=config.TOP_K,
-                                 image_prompt=image_prompt,
-                                 )
-            output_lines.append(dict(
-                file_name=image_prompt,
-                description=answer
-            ))
 
     if rank == 0:
-        with open("output.jsonl", "w") as fp:
-            for each in output_lines:
-                fp.write(json.dumps(each) + "\n")
+        input_data = prepare_data()
+    else:
+        input_data = [None]
+
+    if world_size > 1:
+        torch.distributed.broadcast_object_list(input_data, src=0)
+
+    print(f"rank {rank}:", input_data[0])
+
+
+    # output_lines = []
+    # for entry in input_data:
+    #     product_description = entry.product_description
+    #     image_prompt = entry.image_path
+    #     question = (
+    #             f"1. Please list all objects you see in the above image. Make sure including the product, {product_description} \n"
+    #             + f"2. What object supports the product, `{product_description}`? \n"
+    #             + "3. What side is this product object anchored on? Choose from (top, bottom, left, right) or (floating) when there is no clear anchoring."
+    #             + "4. Is the supporting surface flat?\n"
+    #             + f"5. Does the objects in the foreground have the same support as the product, `{product_description}`?\n"
+    #             + "6. What is the size estimation of the product, `product_description`, in inches?\n"
+    #             + "Format answers of these questions in json:\n"
+    #             + "`all_objects`: list; `supporting_object`: str; anchored_side: str; is_flat: bool; same_support: bool; product_height: float; product_width: float;"
+    #     )
+    #
+    #     if os.path.isfile(image_prompt):
+    #         answer = run_predict(args,
+    #                              model,
+    #                              image_processor,
+    #                              text_processor_infer,
+    #                              rank,
+    #                              input_text="Could you describe this image in 300 tokens?",
+    #                              temperature=config.MODEL_TEMP,
+    #                              top_p=config.TOP_P,
+    #                              top_k=config.TOP_K,
+    #                              image_prompt=image_prompt,
+    #                              )
+    #         output_lines.append(dict(
+    #             file_name=image_prompt,
+    #             description=answer
+    #         ))
+    #
+    # if rank == 0:
+    #     with open("output.jsonl", "w") as fp:
+    #         for each in output_lines:
+    #             fp.write(json.dumps(each) + "\n")
