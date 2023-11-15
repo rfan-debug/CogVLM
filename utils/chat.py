@@ -153,6 +153,7 @@ def chat(image_path: Optional[List[str]],
         strategy=strategy,
         **inputs
     )[0]  # drop memory
+    print("chat:outputs", output)
 
     # ---------------
     # port from inference_glm.py, more general than chat mode
