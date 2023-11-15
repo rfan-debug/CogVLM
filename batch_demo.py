@@ -91,7 +91,6 @@ def run_predict(args,
 
                 print("image_prompts:", image_prompts)
                 print("input_texts:", input_texts)
-                pil_img.save(f"temp_{rank}.png")
 
             print(f"Calling chat from rank={rank}")
             response, _, cache_image = chat(
