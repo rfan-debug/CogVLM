@@ -162,11 +162,16 @@ if __name__ == '__main__':
     parser = CogVLMModel.add_model_specific_args(parser)
     args = parser.parse_args()
 
+    init_method = 'tcp://'
+    master_ip = os.getenv('MASTER_ADDR', '127.0.0.1')
+    master_port = os.getenv('MASTER_PORT', '16666')
+    init_method += master_ip + ':' + master_port
     if not torch.distributed.is_initialized():
         torch.distributed.init_process_group(
             "nccl",
             world_size=world_size,
-            rank=rank
+            rank=rank,
+            init_method=init_method,
         )
     # Load models
     # model, image_processor, text_processor_infer = load_model(args, rank, world_size)
