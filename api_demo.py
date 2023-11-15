@@ -19,8 +19,11 @@ from utils.language import llama2_tokenizer, llama2_text_processor_inference
 from utils.vision import get_image_processor
 
 
+RANK = int(os.environ.get('RANK', 0))
+WORLD_SIZE = int(os.environ.get('WORLD_SIZE', 1))
+LOCAL_RANK = int(os.environ.get('LOCAL_RANK', None))
 
-app = FastAPI()
+
 def process_image_without_resize(image_prompt):
     image = Image.open(image_prompt)
     timestamp = int(time.time())
@@ -29,48 +32,39 @@ def process_image_without_resize(image_prompt):
     return image, filename_grounding
 
 
-def load_model(args, rank, world_size):
-    print(f"Loading model from {rank} with world size {world_size}\n")
+def load_model(args):
+    print(f"Loading model from {RANK} with world size {WORLD_SIZE}\n")
     model, model_args = CogVLMModel.from_pretrained(
         args.from_pretrained,
         args=argparse.Namespace(
             deepspeed=None,
-            local_rank=rank,
-            rank=rank,
-            world_size=world_size,
-            model_parallel_size=world_size,
+            local_rank=LOCAL_RANK,
+            rank=RANK,
+            world_size=WORLD_SIZE,
+            model_parallel_size=WORLD_SIZE,
             mode='inference',
             skip_init=True,
             use_gpu_initialization=True if torch.cuda.is_available() else False,
             device=f'cuda',
             **vars(args)
         ),
-        overwrite_args={'model_parallel_size': world_size} if world_size != 1 else {}
+        overwrite_args={'model_parallel_size': WORLD_SIZE} if WORLD_SIZE != 1 else {}
     )
     model = model.eval()
-    assert world_size == get_model_parallel_world_size(), "world size must equal to model parallel size for cli_demo!"
+    assert WORLD_SIZE == get_model_parallel_world_size(), "world size must equal to model parallel size for cli_demo!"
     tokenizer = llama2_tokenizer(args.local_tokenizer, signal_type=args.version)
     image_processor = get_image_processor(model_args.eva_args["image_size"][0])
     model.add_mixin('auto-regressive', CachedAutoregressiveMixin())
     text_processor_infer = llama2_text_processor_inference(tokenizer, args.max_length, model.image_length)
 
-    print(f"Model loading finished from {rank} with world size {world_size}\n.")
+    print(f"Model loading finished from {RANK} with world size {WORLD_SIZE}\n.")
     return model, image_processor, text_processor_infer
 
-@app.get("/")
-def home():
-    print("Welcome to fast api")
-    run_main(args,
-             model,
-             image_processor,
-             text_processor_infer,
-             rank)
 
 def run_main(args,
              model,
              image_processor,
              text_processor_infer,
-             rank,
              ):
     is_grounding = 'grounding' in args.from_pretrained
     def call_predict(
@@ -91,7 +85,6 @@ def run_main(args,
             image_prompt: {image_prompt}
             result_previous: {result_previous}
             hidden_image: {hidden_image}
-            rank: {rank}
         """
 
         print(
@@ -108,7 +101,7 @@ def run_main(args,
                 pil_img, image_path_grounding = process_image_without_resize(image_prompt)
 
                 # Pull all necessary data into list so we can broadcast them through `torch.distributed.broadcast_object_list`.
-                if rank == 0:
+                if RANK == 0:
                     image_prompts = [image_prompt]
                     input_texts = [input_text]
                     pil_imgs = [pil_img]
@@ -120,7 +113,7 @@ def run_main(args,
 
                 print("result_text: ", result_text)
 
-                if world_size > 1:
+                if WORLD_SIZE > 1:
                     torch.distributed.broadcast_object_list(input_texts, src=0)
                     if len(result_text) > 0:
                         torch.distributed.broadcast_object_list(result_text, src=0)
@@ -130,9 +123,9 @@ def run_main(args,
                     print("image_prompts:", image_prompts)
                     print("result_texts:", result_text)
                     print("input_texts:", input_texts)
-                    pil_img.save(f"temp_{rank}.png")
+                    pil_img.save(f"temp_{RANK}.png")
 
-                print(f"Calling chat from rank={rank}")
+                print(f"Calling chat from rank={RANK}")
                 response, _, cache_image = chat(
                     image_path=image_prompts[0],
                     model=model,
@@ -169,7 +162,7 @@ def run_main(args,
         return "", result_text, hidden_image
 
 
-    print(f"This rank: {rank}, running the gradio UI")
+    print(f"This rank: {RANK}, running the gradio UI")
     input_text, result_text, hidden_image_hash = call_predict(
         input_text="Describe this image",
         temperature=0.7,
@@ -201,11 +194,9 @@ if __name__ == '__main__':
     parser.add_argument("--fp16", action="store_true")
     parser.add_argument("--bf16", action="store_true")
     args = parser.parse_args()
-    rank = int(os.environ.get('RANK', 0))
-    world_size = int(os.environ.get('WORLD_SIZE', 1))
-    local_rank = int(os.environ.get('LOCAL_RANK', None))
-    print(f"local_rank: {local_rank}")
+
     parser = CogVLMModel.add_model_specific_args(parser)
     args = parser.parse_args()
     # Load models
-    model, image_processor, text_processor_infer = load_model(args, rank, world_size)
+    model, image_processor, text_processor_infer = load_model(args)
+    run_main(args, model, image_processor, text_processor_infer)

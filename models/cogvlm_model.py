@@ -38,9 +38,9 @@ from copy import deepcopy
 def override_dist_dtype_device_args(args, b={}):
     if args.mode == 'inference':
         minimal_args = argparse.Namespace(
-            world_size=args.world_size,
-            rank=args.rank,
-            local_rank=args.local_rank,
+            world_size=args.WORLD_SIZE,
+            rank=args.RANK,
+            local_rank=args.LOCAL_RANK,
             skip_init=args.skip_init,
             use_gpu_initialization=args.use_gpu_initialization,
             deepspeed=args.deepspeed,
@@ -51,9 +51,9 @@ def override_dist_dtype_device_args(args, b={}):
         )
     else:
         minimal_args = argparse.Namespace(
-                world_size=args.world_size,
-                rank=args.rank,
-                local_rank=args.local_rank,
+                world_size=args.WORLD_SIZE,
+                rank=args.RANK,
+                local_rank=args.LOCAL_RANK,
                 skip_init=args.skip_init,
                 use_gpu_initialization=args.use_gpu_initialization,
                 deepspeed=args.deepspeed,
