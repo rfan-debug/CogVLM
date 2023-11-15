@@ -163,7 +163,11 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     if not torch.distributed.is_initialized():
-        torch.distributed.init_process_group("nccl")
+        torch.distributed.init_process_group(
+            "nccl",
+            world_size=world_size,
+            rank=rank
+        )
     # Load models
     # model, image_processor, text_processor_infer = load_model(args, rank, world_size)
 
