@@ -188,7 +188,7 @@ if __name__ == '__main__':
 
         print(f"Surfacing {entry.image_path}")
         if os.path.isfile(image_prompt):
-            answers = []
+            qa_pairs = []
             # Ask question one by one. Otherwise, the LM might suffer from hallucination.
             for question in questions:
                 answer = run_predict(args,
@@ -202,11 +202,10 @@ if __name__ == '__main__':
                                      top_k=config.TOP_K,
                                      image_prompt=image_prompt,
                                      )
-                answers.append(answer)
+                qa_pairs.append((question, answer))
             output_lines.append(dict(
                 file_name=image_prompt,
-                description="\n".join(answers),
-                question=questions,
+                qa_pairs=qa_pairs,
             ))
 
     if rank == 0:
