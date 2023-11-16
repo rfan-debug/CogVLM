@@ -202,7 +202,10 @@ if __name__ == '__main__':
                                      top_k=config.TOP_K,
                                      image_prompt=image_prompt,
                                      )
-                qa_pairs.append((question, answer))
+                qa_pairs.append({
+                    "question": question,
+                    "answer":answer
+                })
             output_lines.append(dict(
                 file_name=image_prompt,
                 qa_pairs=qa_pairs,
